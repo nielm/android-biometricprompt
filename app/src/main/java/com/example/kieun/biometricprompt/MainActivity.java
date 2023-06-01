@@ -155,8 +155,12 @@ public class MainActivity extends AppCompatActivity
                     throw new RuntimeException(e);
                 }
 
-                // Create biometricPrompt
-                showBiometricPrompt(signature);
+                if(signature == null) {
+                    Toast.makeText(this, "Key not yet registered", Toast.LENGTH_SHORT).show();
+                } else {
+                    // Create biometricPrompt
+                    showBiometricPrompt(signature);
+                }
             } else {
                 // Cannot use biometric prompt
                 Toast.makeText(this, "Cannot use biometric", Toast.LENGTH_SHORT).show();
@@ -178,6 +182,7 @@ public class MainActivity extends AppCompatActivity
                 .setTitle("Title")
                 .setSubtitle("Subtitle")
                 .setNegativeButtonText("Cancel")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 .build();
 
         // Show biometric prompt
@@ -199,6 +204,8 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                 Log.i(TAG, "onAuthenticationSucceeded");
+                Log.i(TAG, "result.authenticationType: " + result.getAuthenticationType());
+
                 super.onAuthenticationSucceeded(result);
                 if (result.getCryptoObject() != null &&
                         result.getCryptoObject().getSignature() != null) {
@@ -209,9 +216,10 @@ public class MainActivity extends AppCompatActivity
                         // Normally, ToBeSignedMessage and Signature are sent to the server and then verified
                         Log.i(TAG, "Message: " + mToBeSignedMessage);
                         Log.i(TAG, "Signature (Base64 Encoded): " + signatureString);
-                        Toast.makeText(getApplicationContext(), mToBeSignedMessage + ":" + signatureString, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getApplicationContext(), "Signed successfully.", Toast.LENGTH_LONG).show();
                     } catch (SignatureException e) {
-                        throw new RuntimeException();
+                        Log.e("TAG","signature failed",e);
+                        throw new RuntimeException(e);
                     }
                 } else {
                     // Error
