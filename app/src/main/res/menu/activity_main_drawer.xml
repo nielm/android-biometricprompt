@@ -10,7 +10,13 @@
             android:title="Register" />
         <item
             android:id="@+id/nav_authenticate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:icon="@drawable/ic_menu_gallery"
             android:title="Authenticate" />
+        <item
+            android:id="@+id/nav_fingerprint"
+            android:icon="@drawable/ic_menu_gallery"
+            android:title="Fingerprint" />
     </group>
 </menu>

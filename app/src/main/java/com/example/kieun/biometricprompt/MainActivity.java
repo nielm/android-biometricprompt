@@ -1,8 +1,12 @@
 package com.example.kieun.biometricprompt;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
 import android.security.keystore.KeyGenParameterSpec;
@@ -39,6 +43,10 @@ import java.security.spec.ECGenParameterSpec;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = MainActivity.class.getName();
@@ -73,6 +81,26 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+
+        iniKey();
+    }
+
+    private void iniKey() {
+        try {
+            final KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,
+                    "AndroidKeyStore");
+            keyGenerator.init(new
+                    KeyGenParameterSpec.Builder(KEY_NAME + "Fingerprint",
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+                    .setUserAuthenticationRequired(true)
+                    .setEncryptionPaddings(
+                            KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                    .build());
+            keyGenerator.generateKey();
+        } catch (Exception e){
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -165,12 +193,76 @@ public class MainActivity extends AppCompatActivity
                 // Cannot use biometric prompt
                 Toast.makeText(this, "Cannot use biometric", Toast.LENGTH_SHORT).show();
             }
+        }  else if (id == R.id.nav_fingerprint) {
+            showFingerprintPrompt();
         }
+
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
+
+    private Cipher getCryptoObject() throws Exception{
+        final Cipher cipher = Cipher.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES + "/"
+                        + KeyProperties.BLOCK_MODE_CBC + "/"
+                        + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+        ;
+        final KeyStore keyStore =  KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+        final SecretKey key = (SecretKey) keyStore.getKey(KEY_NAME + "Fingerprint", null);
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        return cipher;
+    }
+    private void showFingerprintPrompt()  {
+        try {
+            FingerprintManager fingerprintManager = (FingerprintManager)
+                    getApplicationContext().getSystemService(Context.FINGERPRINT_SERVICE);
+
+            CancellationSignal cancellationSignal = new CancellationSignal();
+
+            if (fingerprintManager.isHardwareDetected() && fingerprintManager.hasEnrolledFingerprints()) {
+                fingerprintManager.authenticate(new FingerprintManager.CryptoObject(getCryptoObject()),
+                        cancellationSignal, 0, new FingerprintManager.AuthenticationCallback() {
+                            @Override
+                            public void onAuthenticationError(int errorCode, CharSequence errString) {
+                                super.onAuthenticationError(errorCode, errString);
+                                Toast.makeText(getApplicationContext(), "Fingerprint.onAuthenticationError", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                            @Override
+                            public void onAuthenticationHelp(int helpCode, CharSequence helpString) {
+                                super.onAuthenticationHelp(helpCode, helpString);
+                                Toast.makeText(getApplicationContext(), "Fingerprint.onAuthenticationHelp", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                            @Override
+                            public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult result) {
+                                super.onAuthenticationSucceeded(result);
+                                Toast.makeText(getApplicationContext(), "Fingerprint.onAuthenticationSucceeded", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                            @Override
+                            public void onAuthenticationFailed() {
+                                super.onAuthenticationFailed();
+                                Toast.makeText(getApplicationContext(), "Fingerprint.onAuthenticationFailed", Toast.LENGTH_SHORT).show();
+
+                            }
+                        }, null);
+
+            } else {
+                Toast.makeText(getApplicationContext(), "fingerprint not supported", Toast.LENGTH_SHORT).show();
+
+            }
+        } catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
 
     private void showBiometricPrompt(Signature signature) {
         BiometricPrompt.AuthenticationCallback authenticationCallback = getAuthenticationCallback();
@@ -218,7 +310,7 @@ public class MainActivity extends AppCompatActivity
                         Log.i(TAG, "Signature (Base64 Encoded): " + signatureString);
                         Toast.makeText(getApplicationContext(), "Signed successfully.", Toast.LENGTH_LONG).show();
                     } catch (SignatureException e) {
-                        Log.e("TAG","signature failed",e);
+                        Log.e(TAG,"signature failed",e);
                         throw new RuntimeException(e);
                     }
                 } else {
